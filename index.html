@@ -104,6 +104,59 @@
     .setting-row label { width: 70px; font-size:0.85rem; }
     input[type=range] { width: 100px; cursor: pointer; }
     @media (max-width: 700px) { .editor-layout { flex-direction: column; } }
+    /* 組合動作區塊 */
+    .combo-section {
+      background: rgba(15,18,28,0.7);
+      border-radius: 1.5rem;
+      padding: 1.4rem 1.6rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .combo-section h3 { color: #f0dbb0; font-size: 1rem; font-weight: 600; }
+    .combo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.8rem;
+    }
+    .combo-card {
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 1.1rem;
+      padding: 0.9rem 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .combo-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+      border-radius: inherit;
+    }
+    .combo-card:hover { transform: translateY(-2px); border-color: var(--combo-color, #f9b84a); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    .combo-card:hover::before { opacity: 0.08; background: var(--combo-color, #f9b84a); }
+    .combo-card.playing { animation: comboPulse 0.5s ease; border-color: var(--combo-color, #f9b84a); }
+    @keyframes comboPulse { 0%{transform:scale(1)} 50%{transform:scale(1.04)} 100%{transform:scale(1)} }
+    .combo-card .combo-icon { font-size: 1.6rem; line-height: 1; }
+    .combo-card .combo-name { font-weight: 700; font-size: 0.9rem; color: #f0dbb0; }
+    .combo-card .combo-desc { font-size: 0.75rem; color: #aaa; }
+    .combo-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 1rem;
+      font-weight: 600;
+      margin-top: 0.1rem;
+      color: #1a1e2b;
+    }
   </style>
 </head>
 <body>
@@ -152,10 +205,16 @@
         </div>
       </div>
     </div>
+    <!-- 六組 VTuber 動作組合 -->
+    <div class="combo-section" id="comboSection">
+      <h3>🎬 六組 VTuber 常見動作組合 <span class="note">（匯出後可直接套用）</span></h3>
+      <div class="combo-grid" id="comboGrid"></div>
+      <div class="note">💡 點擊卡片可預覽動作效果說明；匯出後在播放器中實際觸發</div>
+    </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="exportHtmlBtn" aria-label="匯出完整 VTuber HTML 檔案">📥 匯出完整 VTuber HTML</button>
     </div>
-    <div class="note" style="text-align:center;">* 匯出的 HTML 僅包含對應部位可用的動作按鈕</div>
+    <div class="note" style="text-align:center;">* 匯出的 HTML 包含六組動作組合，依部位自動啟用</div>
   </div>
 </div>
 
@@ -205,6 +264,71 @@
     angry:        { label: '😠 生氣', needs: ['嘴巴'] },
     surprise:     { label: '😲 驚訝', needs: ['嘴巴'] }
   };
+
+  // ---------- 六組 VTuber 常見動作組合 ----------
+  // needs 為 any OR 邏輯：只要有其中一個部位就顯示
+  const comboActions = [
+    {
+      key: 'combo_greet',
+      label: '👋 打招呼',
+      icon: '👋',
+      desc: '揮手 + 點頭',
+      color: '#4ecdc4',
+      actions: ['wave','nod'],
+      needs: ['左手','右手','頭部'],
+      any: true
+    },
+    {
+      key: 'combo_happy',
+      label: '🌟 開心歡呼',
+      icon: '🌟',
+      desc: '微笑 + 眨眼 + 點頭',
+      color: '#f9b84a',
+      actions: ['happy','blink','nod'],
+      needs: ['嘴巴','左眼','右眼','頭部'],
+      any: true
+    },
+    {
+      key: 'combo_surprise',
+      label: '😱 驚訝反應',
+      icon: '😱',
+      desc: '驚訝 + 跳動',
+      color: '#e67e22',
+      actions: ['surprise','jump'],
+      needs: ['嘴巴'],
+      any: true
+    },
+    {
+      key: 'combo_shy',
+      label: '😳 害羞緊張',
+      icon: '😳',
+      desc: '快速眨眼 + 小幅抖動',
+      color: '#e91e8c',
+      actions: ['multiBlink','shake'],
+      needs: ['左眼','右眼','頭部'],
+      any: true
+    },
+    {
+      key: 'combo_bye',
+      label: '👋 說再見',
+      icon: '🥹',
+      desc: '大幅揮手 + 點頭',
+      color: '#9b59b6',
+      actions: ['bigWave','nod'],
+      needs: ['左手','右手','頭部'],
+      any: true
+    },
+    {
+      key: 'combo_idle',
+      label: '💤 直播待機',
+      icon: '💤',
+      desc: '呼吸 + 緩慢搖擺',
+      color: '#3498db',
+      actions: ['breathToggle','sway'],
+      needs: ['身體','頭部'],
+      any: true
+    }
+  ];
 
   // ---------- Toast 提示（取代 alert 預覽）----------
   function showToast(msg, duration = 2000) {
@@ -438,6 +562,43 @@
     });
   }
 
+  // ---------- 六組組合動作卡片渲染 ----------
+  function renderComboCards() {
+    const comboGrid = document.getElementById('comboGrid');
+    if (!comboGrid) return;
+    comboGrid.innerHTML = '';
+    const selected = getSelectedPartNames();
+
+    comboActions.forEach(combo => {
+      const available = combo.any
+        ? combo.needs.some(n => selected.has(n))
+        : combo.needs.every(n => selected.has(n));
+
+      const card = document.createElement('div');
+      card.className = 'combo-card';
+      card.style.setProperty('--combo-color', combo.color);
+      if (!available) card.style.opacity = '0.38';
+
+      card.innerHTML =
+        '<div class="combo-icon">' + combo.icon + '</div>' +
+        '<div class="combo-name">' + combo.label + '</div>' +
+        '<div class="combo-desc">' + combo.desc + '</div>' +
+        '<span class="combo-tag" style="background:' + combo.color + '">' + (available ? '✓ 可用' : '缺少部位') + '</span>';
+
+      card.addEventListener('click', function() {
+        if (!available) {
+          showToast('⚠️ 「' + combo.label + '」需要：' + combo.needs.join('、'));
+          return;
+        }
+        card.classList.add('playing');
+        setTimeout(function() { card.classList.remove('playing'); }, 500);
+        showToast('🎬 「' + combo.label + '」：' + combo.desc + ' — 匯出後即可觸發！', 2500);
+      });
+
+      comboGrid.appendChild(card);
+    });
+  }
+
   // ---------- 動作按鈕渲染 ----------
   function renderActionButtons() {
     actionButtonsDiv.innerHTML = '';
@@ -448,19 +609,20 @@
       hint.className   = 'note';
       hint.textContent = '尚無可用動作（請圈選並指定部位名稱）';
       actionButtonsDiv.appendChild(hint);
-      return;
+    } else {
+      available.forEach(([key, act]) => {
+        const btn = document.createElement('button');
+        btn.className   = 'action-btn';
+        btn.textContent = act.label;
+        btn.setAttribute('aria-label', '預覽動作：' + act.label);
+        btn.addEventListener('click', () =>
+          showToast('✅ 動作「' + act.label + '」將在匯出後完整呈現')
+        );
+        actionButtonsDiv.appendChild(btn);
+      });
     }
-
-    available.forEach(([key, act]) => {
-      const btn = document.createElement('button');
-      btn.className   = 'action-btn';
-      btn.textContent = act.label;
-      btn.setAttribute('aria-label', `預覽動作：${act.label}`);
-      btn.addEventListener('click', () =>
-        showToast(`✅ 動作「${act.label}」將在匯出後完整呈現`)
-      );
-      actionButtonsDiv.appendChild(btn);
-    });
+    // 同步更新組合卡片狀態
+    renderComboCards();
   }
 
   // ---------- 清除 / 重傳 ----------
@@ -535,6 +697,8 @@
 `    .btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#f0dbb0; padding:6px 14px; border-radius:20px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:background 0.15s,color 0.15s; }`,
 `    .btn:hover { background:#f9b84a; color:#1a1e2b; }`,
 `    .btn.active { background:#f9b84a; color:#1a1e2b; }`,
+`    .combo-btn { font-size:0.82rem; padding:5px 11px; background:rgba(255,255,255,0.07); }`,
+`    .combo-btn:hover { filter:brightness(1.25); background:rgba(255,255,255,0.18); color:#fff !important; }`,
 `  </style>`,
 `</head>`,
 `<body>`,
@@ -696,6 +860,30 @@ scriptOpen,
 `      btn.addEventListener('click', () => executeAction(act.key, btn));`,
 `      controls.appendChild(btn);`,
 `    });`,
+`    // ── 六組組合動作 ──`,
+`    var comboDefs = [`,
+`      { key:'combo_greet',   label:'👋 打招呼',   color:'#4ecdc4', needs:['左手','右手','頭部'] },`,
+`      { key:'combo_happy',   label:'🌟 開心歡呼', color:'#f9b84a', needs:['嘴巴','左眼','右眼','頭部'] },`,
+`      { key:'combo_surprise',label:'😱 驚訝反應', color:'#e67e22', needs:['嘴巴'] },`,
+`      { key:'combo_shy',     label:'😳 害羞緊張', color:'#e91e8c', needs:['左眼','右眼','頭部'] },`,
+`      { key:'combo_bye',     label:'🥹 說再見',   color:'#9b59b6', needs:['左手','右手','頭部'] },`,
+`      { key:'combo_idle',    label:'💤 直播待機', color:'#3498db', needs:['身體','頭部'] }`,
+`    ];`,
+`    var selectedNames = new Set(parts.map(p => p.name).filter(n => n !== '請選擇' && n !== '其他'));`,
+`    var sep = document.createElement('div');`,
+`    sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.2);height:28px;margin:0 2px;';`,
+`    controls.appendChild(sep);`,
+`    comboDefs.forEach(function(combo) {`,
+`      var available = combo.needs.some(function(n){ return selectedNames.has(n); });`,
+`      if (!available) return;`,
+`      var btn = document.createElement('button');`,
+`      btn.className = 'btn combo-btn';`,
+`      btn.textContent = combo.label;`,
+`      btn.style.borderColor = combo.color;`,
+`      btn.style.color = combo.color;`,
+`      btn.addEventListener('click', function(){ executeAction(combo.key, btn); });`,
+`      controls.appendChild(btn);`,
+`    });`,
 `  }`,
 ``,
 `  function executeAction(action, btn) {`,
@@ -720,7 +908,118 @@ scriptOpen,
 `        triggerExpression({ '嘴巴':'scale(1,0.5)', '左眼':'rotate(-10deg)', '右眼':'rotate(10deg)' }); break;`,
 `      case 'surprise':`,
 `        triggerExpression({ '嘴巴':'scale(1.6,1.6)', '左眼':'scale(1.3,1.3)', '右眼':'scale(1.3,1.3)' }); break;`,
+`      // ── 六組組合動作 ──`,
+`      case 'combo_greet':`,
+`        animatePart('左手', 'rotate', -40, 400);`,
+`        animatePart('右手', 'rotate',  40, 400);`,
+`        setTimeout(function(){ animatePart('頭部', 'rotateX', 12, 500); }, 200); break;`,
+`      case 'combo_happy':`,
+`        triggerExpression({ '嘴巴':'scale(1,1.5)', '左眼':'scale(1,0.6)', '右眼':'scale(1,0.6)' });`,
+`        setTimeout(function(){ triggerBlink(); }, 200);`,
+`        setTimeout(function(){ animatePart('頭部', 'rotateX', 10, 400); }, 400); break;`,
+`      case 'combo_surprise':`,
+`        triggerExpression({ '嘴巴':'scale(1.8,1.8)', '左眼':'scale(1.4,1.4)', '右眼':'scale(1.4,1.4)' });`,
+`        triggerJump(); break;`,
+`      case 'combo_shy':`,
+`        triggerMultiBlink(3);`,
+`        triggerShake('頭部', 4, 500); break;`,
+`      case 'combo_bye':`,
+`        triggerBigWave();`,
+`        setTimeout(function(){ animatePart('頭部', 'rotateX', 18, 600); }, 300);`,
+`        setTimeout(function(){ animatePart('頭部', 'rotateX', 18, 600); }, 1000); break;`,
+`      case 'combo_idle':`,
+`        autoBreathEnabled = true;`,
+`        if(btn) btn.classList.add('active');`,
+`        triggerSway(); break;`,
 `    }`,
+`  }`,
+``,
+`  function triggerJump() {`,
+`    layers.forEach(function(layer) {`,
+`      var orig = layer.dataset.baseTransform || '';`,
+`      layer.dataset.blinking = 'true';`,
+`      layer.style.transition = 'transform 0.18s cubic-bezier(.17,.67,.48,1.5)';`,
+`      layer.style.transform  = orig + ' translateY(-18px)';`,
+`      setTimeout(function(){`,
+`        layer.style.transition = 'transform 0.22s ease-in';`,
+`        layer.style.transform  = orig;`,
+`        setTimeout(function(){ layer.dataset.blinking = 'false'; }, 230);`,
+`      }, 200);`,
+`    });`,
+`  }`,
+``,
+`  function triggerMultiBlink(times) {`,
+`    var count = 0;`,
+`    function doBlink() {`,
+`      if (count >= times) return;`,
+`      triggerBlink();`,
+`      count++;`,
+`      setTimeout(doBlink, 280);`,
+`    }`,
+`    doBlink();`,
+`  }`,
+``,
+`  function triggerShake(partName, amplitude, duration) {`,
+`    layers.forEach(function(layer) {`,
+`      if (layer.dataset.partName !== partName) return;`,
+`      var orig = layer.dataset.baseTransform || '';`,
+`      var steps = 8;`,
+`      var stepTime = duration / steps;`,
+`      layer.dataset.blinking = 'true';`,
+`      var i = 0;`,
+`      var iv = setInterval(function(){`,
+`        var dir = (i % 2 === 0 ? 1 : -1) * amplitude * (1 - i/steps);`,
+`        layer.style.transition = 'transform ' + (stepTime*0.9) + 'ms ease-in-out';`,
+`        layer.style.transform  = orig + ' rotate(' + dir + 'deg)';`,
+`        i++;`,
+`        if (i > steps) {`,
+`          clearInterval(iv);`,
+`          layer.style.transform  = orig;`,
+`          layer.dataset.blinking = 'false';`,
+`        }`,
+`      }, stepTime);`,
+`    });`,
+`  }`,
+``,
+`  function triggerBigWave() {`,
+`    var hands = ['左手','右手'];`,
+`    var swings = [-50, 50, -45, 40, -30, 0];`,
+`    function doSwing(idx) {`,
+`      if (idx >= swings.length) return;`,
+`      var angle = swings[idx];`,
+`      layers.forEach(function(layer) {`,
+`        var n = layer.dataset.partName;`,
+`        if (n !== '左手' && n !== '右手') return;`,
+`        var orig = layer.dataset.baseTransform || '';`,
+`        layer.dataset.blinking = 'true';`,
+`        layer.style.transition = 'transform 160ms ease-in-out';`,
+`        layer.style.transform  = orig + ' rotate(' + (n==='左手'?-angle:angle) + 'deg)';`,
+`        if (idx === swings.length-1) {`,
+`          setTimeout(function(){`,
+`            layer.style.transform = orig;`,
+`            layer.dataset.blinking = 'false';`,
+`          }, 180);`,
+`        }`,
+`      });`,
+`      setTimeout(function(){ doSwing(idx+1); }, 175);`,
+`    }`,
+`    doSwing(0);`,
+`  }`,
+``,
+`  var swayTimer = null;`,
+`  function triggerSway() {`,
+`    if (swayTimer) return;`,
+`    var t = 0;`,
+`    swayTimer = setInterval(function(){`,
+`      t += 0.04;`,
+`      var angle = Math.sin(t) * 2.5;`,
+`      layers.forEach(function(layer){`,
+`        if (layer.dataset.partName === '頭部') {`,
+`          layer.style.transition = 'transform 120ms linear';`,
+`          layer.style.transform  = (layer.dataset.baseTransform||'') + ' rotate(' + angle + 'deg)';`,
+`        }`,
+`      });`,
+`    }, 60);`,
 `  }`,
 ``,
 `  function animatePart(partName, prop, angle, duration) {`,

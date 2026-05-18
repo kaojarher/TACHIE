@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=2.0">
+  <title>PNG VTuber 完整系統 - 編輯器與匯出</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #1a1e2b;
+      font-family: 'Segoe UI', 'Noto Sans TC', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 2.5rem;
+      padding: 2rem 1.8rem;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    h1 { text-align: center; color: #f0dbb0; font-weight: 600; font-size: clamp(1.7rem, 5vw, 2.4rem); }
+    .upload-area {
+      background: rgba(25,28,38,0.7);
+      border: 2px dashed rgba(255,255,255,0.3);
+      border-radius: 2rem;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-area:hover, .drag-over { border-color:#f9b84a; background:rgba(249,184,74,0.1); }
+    .editor-layout { display: flex; flex-wrap: wrap; gap: 1.8rem; }
+    .canvas-container {
+      flex: 2; min-width: 300px; position: relative; background: #0f1117;
+      border-radius: 1.8rem; overflow: hidden; display: flex; align-items: center;
+      justify-content: center; box-shadow: 0 10px 25px rgba(0,0,0,0.7); user-select: none;
+    }
+    #mainImage { max-width: 100%; max-height: 70vh; display: block; pointer-events: none; }
+    #drawCanvas {
+      position: absolute; top:0; left:0; width:100%; height:100%; z-index:10;
+      touch-action: none; cursor: crosshair;
+    }
+    .side-panel {
+      flex: 1; min-width: 260px; background: rgba(20,22,30,0.8); border-radius: 1.5rem;
+      padding: 1.3rem; backdrop-filter: blur(12px); display: flex; flex-direction: column;
+      gap: 1rem; color: #ddd; border: 1px solid rgba(255,255,255,0.1); max-height: 70vh; overflow-y: auto;
+    }
+    .part-list {
+      list-style: none; max-height: 150px; overflow-y: auto; padding: 0.3rem;
+      background: rgba(0,0,0,0.3); border-radius: 0.8rem; min-height: 60px;
+    }
+    .empty-list-message { color: #aaa; font-style: italic; padding: 1rem; text-align: center; }
+    .part-item {
+      display: flex; align-items: center; gap: 0.4rem; background: rgba(255,255,255,0.05);
+      border-radius: 0.7rem; padding: 0.5rem; margin-bottom: 0.4rem;
+    }
+    .part-item select {
+      background: #2a2f3f; border: 1px solid #4a5060; color: #fff;
+      padding: 0.3rem; border-radius: 0.4rem; font-size: 0.85rem; flex: 1;
+    }
+    .part-item button {
+      background: #c0392b; border: none; color: white; padding: 0.2rem 0.5rem;
+      border-radius: 0.4rem; cursor: pointer; transition: background 0.15s;
+    }
+    .part-item button:hover { background: #e74c3c; }
+    .actions-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .action-btn {
+      background: #3a4055; border: none; color: #f0dbb0; padding: 0.5rem 0.9rem;
+      border-radius: 2rem; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+    }
+    .action-btn:hover { background:#f9b84a; color:#1a1e2b; }
+    /* 預覽提示 toast */
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: rgba(249,184,74,0.95); color: #1a1e2b; padding: 0.6rem 1.4rem;
+      border-radius: 2rem; font-weight: 600; font-size: 0.9rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .btn-row { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; margin-top: 0.3rem; }
+    .btn {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      padding: 0.6rem 1.2rem; border-radius: 2rem; color: #f0e0c0; cursor: pointer;
+      font-weight: 600; transition: opacity 0.15s;
+    }
+    .btn-primary { background:#f9b84a; border-color:#f9b84a; color:#1a1e2b; }
+    .btn:hover { opacity:0.85; }
+    .note { font-size:0.8rem; color:#aaa; }
+    .setting-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
+    .setting-row label { width: 70px; font-size:0.85rem; }
+    input[type=range] { width: 100px; cursor: pointer; }
+    @media (max-width: 700px) { .editor-layout { flex-direction: column; } }
+  </style>
+</head>
+<body>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="app">
+  <h1>🎭 完整 PNG VTuber 系統</h1>
+
+  <div id="uploadSection" class="upload-area" role="button" tabindex="0" aria-label="點擊或拖放圖片上傳">
+    <div style="font-size:2.4rem;" aria-hidden="true">🖼️</div>
+    <div>點擊或拖放圖片上傳</div>
+    <div class="note">支援 PNG / JPG / WebP</div>
+    <input type="file" id="fileInput" accept="image/*" aria-label="選擇圖片檔案">
+  </div>
+
+  <div id="editorSection" style="display: none; flex-direction: column; gap: 1.5rem;">
+    <div class="editor-layout">
+      <div class="canvas-container" id="canvasContainer">
+        <img id="mainImage" src="" alt="立繪圖片" crossorigin="anonymous">
+        <canvas id="drawCanvas" aria-label="部位框選區域" role="img"></canvas>
+      </div>
+      <div class="side-panel" role="complementary" aria-label="設定面板">
+        <div><strong>📌 部位列表</strong></div>
+        <ul class="part-list" id="partList" aria-label="已標記部位列表"></ul>
+        <div class="note">拖曳繪製矩形，選擇對應部位</div>
+        <div><strong>🎭 即時動態設定</strong></div>
+        <div class="setting-row">
+          <label for="followStrength">跟隨強度</label>
+          <input type="range" id="followStrength" min="0" max="20" value="8" step="1" aria-valuetext="8">
+          <span id="followValue" aria-live="polite">8</span>
+        </div>
+        <div class="setting-row">
+          <label for="blinkInterval">眨眼間隔</label>
+          <input type="range" id="blinkInterval" min="1" max="8" value="3" step="0.5" aria-valuetext="3秒">
+          <span id="blinkValue" aria-live="polite">3</span>秒
+        </div>
+        <div class="setting-row">
+          <label for="micSensitivity">麥克風靈敏</label>
+          <input type="range" id="micSensitivity" min="1" max="10" value="5" step="0.5" aria-valuetext="5">
+          <span id="micValue" aria-live="polite">5</span>
+        </div>
+        <div><strong>🎬 可用動作</strong> <span class="note">(依部位自動顯示)</span></div>
+        <div class="actions-grid" id="actionButtons" aria-label="可用動作按鈕"></div>
+        <div class="btn-row">
+          <button class="btn" id="clearPartsBtn" aria-label="清除所有部位">🗑️ 清除</button>
+          <button class="btn" id="resetUploadBtn" aria-label="重新上傳圖片">🔄 重傳</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="exportHtmlBtn" aria-label="匯出完整 VTuber HTML 檔案">📥 匯出完整 VTuber HTML</button>
+    </div>
+    <div class="note" style="text-align:center;">* 匯出的 HTML 僅包含對應部位可用的動作按鈕</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---------- DOM refs ----------
+  const uploadSection   = document.getElementById('uploadSection');
+  const fileInput       = document.getElementById('fileInput');
+  const editorSection   = document.getElementById('editorSection');
+  const mainImage       = document.getElementById('mainImage');
+  const drawCanvas      = document.getElementById('drawCanvas');
+  const canvasContainer = document.getElementById('canvasContainer');
+  const partList        = document.getElementById('partList');
+  const actionButtonsDiv= document.getElementById('actionButtons');
+  const clearPartsBtn   = document.getElementById('clearPartsBtn');
+  const resetUploadBtn  = document.getElementById('resetUploadBtn');
+  const exportHtmlBtn   = document.getElementById('exportHtmlBtn');
+  const followStrength  = document.getElementById('followStrength');
+  const followValue     = document.getElementById('followValue');
+  const blinkInterval   = document.getElementById('blinkInterval');
+  const blinkValue      = document.getElementById('blinkValue');
+  const micSensitivity  = document.getElementById('micSensitivity');
+  const micValue        = document.getElementById('micValue');
+  const toastEl         = document.getElementById('toast');
+
+  // ---------- 快取 canvas context ----------
+  const ctx = drawCanvas.getContext('2d');
+
+  // ---------- 狀態 ----------
+  let imageBase64 = null;
+  let parts = [];
+  let isDrawing = false, startX = 0, startY = 0, currentRect = null;
+  let resizeObserver = null;
+  let toastTimer = null;
+
+  const partNames = ['頭部','左眼','右眼','嘴巴','身體','左手','右手','左腿','右腿','其他'];
+
+  const actionRequirements = {
+    nod:          { label: '🙆 點頭', needs: ['頭部'] },
+    blink:        { label: '😉 眨眼', needs: ['左眼','右眼'], any: true },
+    wave:         { label: '👋 揮手', needs: ['左手','右手'], any: true },
+    walk:         { label: '🚶 走路', needs: ['左腿','右腿'], any: true },
+    breathToggle: { label: '🫁 呼吸', needs: ['身體'] },
+    happy:        { label: '😊 微笑', needs: ['嘴巴'] },
+    angry:        { label: '😠 生氣', needs: ['嘴巴'] },
+    surprise:     { label: '😲 驚訝', needs: ['嘴巴'] }
+  };
+
+  // ---------- Toast 提示（取代 alert 預覽）----------
+  function showToast(msg, duration = 2000) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), duration);
+  }
+
+  // ---------- 上傳 ----------
+  uploadSection.addEventListener('click', e => {
+    if (e.target !== fileInput) fileInput.click();
+  });
+  uploadSection.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  uploadSection.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadSection.classList.add('drag-over');
+  });
+  uploadSection.addEventListener('dragleave', e => {
+    e.preventDefault();
+    uploadSection.classList.remove('drag-over');
+  });
+  uploadSection.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadSection.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) {
+      showToast('⚠️ 請上傳圖片檔案（PNG / JPG / WebP）');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      imageBase64 = e.target.result;
+      mainImage.onload = () => {
+        uploadSection.style.display = 'none';
+        editorSection.style.display = 'flex';
+        parts = [];
+        renderPartList();
+        setupCanvas();
+        renderActionButtons();
+      };
+      mainImage.src = imageBase64;
+    };
+    reader.onerror = () => showToast('⚠️ 讀取檔案失敗，請再試一次');
+    reader.readAsDataURL(file);
+  }
+
+  // ---------- Canvas 繪圖 ----------
+  function setupCanvas() {
+    // 解除前一次的 ResizeObserver（避免重複監聽）
+    if (resizeObserver) resizeObserver.disconnect();
+
+    function resize() {
+      const rect = canvasContainer.getBoundingClientRect();
+      drawCanvas.width  = rect.width;
+      drawCanvas.height = rect.height;
+      redrawCanvas();
+    }
+
+    // 優先使用 ResizeObserver 精準監聽容器尺寸
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => resize());
+      resizeObserver.observe(canvasContainer);
+    } else {
+      window.addEventListener('resize', resize);
+    }
+    resize();
+
+    function getCoords(e) {
+      const rect = drawCanvas.getBoundingClientRect();
+      const src  = e.touches ? e.touches[0] : e;
+      return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+    }
+
+    function onStart(e) {
+      e.preventDefault();
+      const c = getCoords(e);
+      startX = c.x; startY = c.y;
+      isDrawing   = true;
+      currentRect = { x: startX, y: startY, w: 0, h: 0 };
+    }
+
+    function onMove(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const c = getCoords(e);
+      currentRect.w = c.x - startX;
+      currentRect.h = c.y - startY;
+      redrawCanvas();
+      drawTempRect(currentRect);
+    }
+
+    function onEnd(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      isDrawing = false;
+      if (Math.abs(currentRect.w) > 8 && Math.abs(currentRect.h) > 8) {
+        const cw = drawCanvas.width, ch = drawCanvas.height;
+        let x = currentRect.x, y = currentRect.y;
+        let w = currentRect.w, h = currentRect.h;
+        if (w < 0) { x += w; w = -w; }
+        if (h < 0) { y += h; h = -h; }
+        const px = (x / cw) * 100, py = (y / ch) * 100;
+        const pw = (w / cw) * 100, ph = (h / ch) * 100;
+        parts.push({
+          id: Date.now(),
+          name: '請選擇',
+          x: Math.min(100, Math.max(0, px)),
+          y: Math.min(100, Math.max(0, py)),
+          w: Math.min(100 - px, pw),
+          h: Math.min(100 - py, ph)
+        });
+        renderPartList();
+        renderActionButtons();
+      }
+      currentRect = null;
+      redrawCanvas();
+    }
+
+    function onCancel() {
+      if (isDrawing) { isDrawing = false; currentRect = null; redrawCanvas(); }
+    }
+
+    drawCanvas.addEventListener('mousedown',  onStart);
+    drawCanvas.addEventListener('mousemove',  onMove);
+    drawCanvas.addEventListener('mouseup',    onEnd);
+    drawCanvas.addEventListener('mouseleave', onCancel);
+    drawCanvas.addEventListener('touchstart', onStart,  { passive: false });
+    drawCanvas.addEventListener('touchmove',  onMove,   { passive: false });
+    drawCanvas.addEventListener('touchend',   onEnd);
+    drawCanvas.addEventListener('touchcancel',onCancel);
+  }
+
+  function redrawCanvas() {
+    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    parts.forEach(p => {
+      const x = (p.x / 100) * drawCanvas.width;
+      const y = (p.y / 100) * drawCanvas.height;
+      const w = (p.w / 100) * drawCanvas.width;
+      const h = (p.h / 100) * drawCanvas.height;
+      ctx.strokeStyle = '#f9b84a';
+      ctx.lineWidth   = 2;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle   = 'rgba(249,184,74,0.2)';
+      ctx.fillRect(x, y, w, h);
+    });
+  }
+
+  function drawTempRect(rect) {
+    if (!rect) return;
+    ctx.strokeStyle = '#ff6666';
+    ctx.lineWidth   = 2;
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  }
+
+  // ---------- 部位工具 ----------
+  function getSelectedPartNames() {
+    return new Set(parts.map(p => p.name).filter(n => n !== '請選擇' && n !== '其他'));
+  }
+
+  function isActionAvailable(actionKey) {
+    const selected = getSelectedPartNames();
+    const req = actionRequirements[actionKey];
+    if (!req) return false;
+    return req.any
+      ? req.needs.some(n => selected.has(n))
+      : req.needs.every(n => selected.has(n));
+  }
+
+  // ---------- 部位列表渲染 ----------
+  function renderPartList() {
+    partList.innerHTML = '';
+    if (parts.length === 0) {
+      const empty = document.createElement('div');
+      empty.className   = 'empty-list-message';
+      empty.textContent = '尚無部位，請在圖片上拖曳';
+      partList.appendChild(empty);
+      return;
+    }
+
+    // 使用 part.id 作為穩定識別符，避免 indexOf 問題
+    parts.forEach(p => {
+      const li  = document.createElement('li');
+      li.className = 'part-item';
+
+      const sel = document.createElement('select');
+      sel.setAttribute('aria-label', '選擇部位名稱');
+
+      const defOpt = document.createElement('option');
+      defOpt.value       = '';
+      defOpt.textContent = '-- 選擇 --';
+      defOpt.disabled    = true;
+      if (p.name === '請選擇') defOpt.selected = true;
+      sel.appendChild(defOpt);
+
+      partNames.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        if (p.name === n) opt.selected = true;
+        sel.appendChild(opt);
+      });
+
+      sel.addEventListener('change', e => {
+        // 用 id 找到正確的 part，不依賴 idx
+        const target = parts.find(pp => pp.id === p.id);
+        if (target) { target.name = e.target.value; renderActionButtons(); }
+      });
+
+      const del = document.createElement('button');
+      del.textContent = '✕';
+      del.setAttribute('aria-label', '刪除此部位');
+      del.addEventListener('click', () => {
+        const idx = parts.findIndex(pp => pp.id === p.id);
+        if (idx !== -1) parts.splice(idx, 1);
+        renderPartList();
+        redrawCanvas();
+        renderActionButtons();
+      });
+
+      li.appendChild(sel);
+      li.appendChild(del);
+      partList.appendChild(li);
+    });
+  }
+
+  // ---------- 動作按鈕渲染 ----------
+  function renderActionButtons() {
+    actionButtonsDiv.innerHTML = '';
+    const available = Object.entries(actionRequirements).filter(([key]) => isActionAvailable(key));
+
+    if (available.length === 0) {
+      const hint = document.createElement('span');
+      hint.className   = 'note';
+      hint.textContent = '尚無可用動作（請圈選並指定部位名稱）';
+      actionButtonsDiv.appendChild(hint);
+      return;
+    }
+
+    available.forEach(([key, act]) => {
+      const btn = document.createElement('button');
+      btn.className   = 'action-btn';
+      btn.textContent = act.label;
+      btn.setAttribute('aria-label', `預覽動作：${act.label}`);
+      btn.addEventListener('click', () =>
+        showToast(`✅ 動作「${act.label}」將在匯出後完整呈現`)
+      );
+      actionButtonsDiv.appendChild(btn);
+    });
+  }
+
+  // ---------- 清除 / 重傳 ----------
+  clearPartsBtn.addEventListener('click', () => {
+    parts = [];
+    renderPartList();
+    redrawCanvas();
+    renderActionButtons();
+  });
+
+  resetUploadBtn.addEventListener('click', () => {
+    parts = [];
+    imageBase64 = null;
+    mainImage.src = '';
+    uploadSection.style.display = 'block';
+    editorSection.style.display = 'none';
+    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    fileInput.value = '';
+  });
+
+  // ---------- 參數滑桿即時回饋 ----------
+  followStrength.addEventListener('input', () => {
+    followValue.textContent = followStrength.value;
+    followStrength.setAttribute('aria-valuetext', followStrength.value);
+  });
+  blinkInterval.addEventListener('input', () => {
+    blinkValue.textContent = blinkInterval.value;
+    blinkInterval.setAttribute('aria-valuetext', blinkInterval.value + '秒');
+  });
+  micSensitivity.addEventListener('input', () => {
+    micValue.textContent = micSensitivity.value;
+    micSensitivity.setAttribute('aria-valuetext', micSensitivity.value);
+  });
+
+  // ---------- 匯出 HTML ----------
+  function generateExportHTML() {
+    if (!imageBase64)   { showToast('⚠️ 請先上傳圖片'); return ''; }
+    if (parts.length === 0) { showToast('⚠️ 請至少圈選一個部位'); return ''; }
+
+    const selectedNames = Array.from(getSelectedPartNames());
+    const partsJSON     = JSON.stringify(parts);
+    const followStr     = followStrength.value;
+    const blinkInt      = blinkInterval.value;
+    const micSens       = micSensitivity.value;
+
+    const availableActions = Object.entries(actionRequirements)
+      .filter(([key]) => isActionAvailable(key))
+      .map(([key, act]) => ({ key, label: act.label, needs: act.needs, any: !!act.any }));
+
+    const hasHead  = selectedNames.includes('頭部');
+    const hasBody  = selectedNames.includes('身體');
+    const hasEyes  = selectedNames.includes('左眼') || selectedNames.includes('右眼');
+    const hasMouth = selectedNames.includes('嘴巴');
+
+    // 用陣列拼接避免 <\/script> 等非標準跳脫寫法
+    const scriptClose  = '<' + '/script>';
+    const scriptOpen   = '<script>';
+
+    return [
+`<!DOCTYPE html>`,
+`<html lang="zh-Hant">`,
+`<head>`,
+`  <meta charset="UTF-8">`,
+`  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">`,
+`  <title>PNG VTuber 完整版</title>`,
+`  <style>`,
+`    * { margin:0; padding:0; box-sizing:border-box; }`,
+`    body { background:#1a1e2b; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; overflow:hidden; font-family:'Segoe UI','Noto Sans TC',sans-serif; }`,
+`    .stage { position:relative; }`,
+`    .layer { position:absolute; background-repeat:no-repeat; transform-origin:center; will-change:transform; transition:transform 0.1s ease-out; }`,
+`    .controls { position:fixed; bottom:20px; display:flex; flex-wrap:wrap; gap:6px; z-index:20; background:rgba(0,0,0,0.5); padding:10px; border-radius:20px; }`,
+`    .btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:#f0dbb0; padding:6px 14px; border-radius:20px; cursor:pointer; font-weight:600; font-size:0.9rem; transition:background 0.15s,color 0.15s; }`,
+`    .btn:hover { background:#f9b84a; color:#1a1e2b; }`,
+`    .btn.active { background:#f9b84a; color:#1a1e2b; }`,
+`  </style>`,
+`</head>`,
+`<body>`,
+`  <div class="stage" id="stage"></div>`,
+`  <div class="controls" id="controls"></div>`,
+scriptOpen,
+`  'use strict';`,
+`  const imageSrc        = ${JSON.stringify(imageBase64)};`,
+`  const parts           = ${partsJSON};`,
+`  const FOLLOW_STRENGTH = ${followStr};`,
+`  const BLINK_INTERVAL  = ${blinkInt} * 1000;`,
+`  const MIC_SENSITIVITY = ${micSens};`,
+`  const HAS_HEAD  = ${hasHead};`,
+`  const HAS_BODY  = ${hasBody};`,
+`  const HAS_EYES  = ${hasEyes};`,
+`  const HAS_MOUTH = ${hasMouth};`,
+`  const availableActions = ${JSON.stringify(availableActions)};`,
+``,
+`  const stage    = document.getElementById('stage');`,
+`  const controls = document.getElementById('controls');`,
+`  let layers = [];`,
+`  let mouseX = 0, mouseY = 0;`,
+`  let targetRotX = 0, targetRotY = 0;`,
+`  let audioCtx, analyser, micStream;`,
+`  let lastBlinkTime = 0;`,
+`  let isBlinking = false;`,
+`  let blinkTimer = null;`,
+`  let autoBreathEnabled = HAS_BODY;`,
+`  let walkEnabled   = false;`,
+`  let walkDirection = 1;`,
+`  let walkTimer     = null;`,
+``,
+`  const img = new Image();`,
+`  img.onload = function() {`,
+`    const naturalW = img.naturalWidth;`,
+`    const naturalH = img.naturalHeight;`,
+`    const maxW     = Math.min(window.innerWidth * 0.9, 700);`,
+`    const stageW   = maxW;`,
+`    const stageH   = maxW * (naturalH / naturalW);`,
+`    stage.style.width  = stageW + 'px';`,
+`    stage.style.height = stageH + 'px';`,
+``,
+`    parts.forEach(p => {`,
+`      const div  = document.createElement('div');`,
+`      div.className = 'layer';`,
+`      const left = (p.x / 100) * stageW;`,
+`      const top  = (p.y / 100) * stageH;`,
+`      const w    = (p.w / 100) * stageW;`,
+`      const h    = (p.h / 100) * stageH;`,
+`      div.style.left   = left + 'px';`,
+`      div.style.top    = top  + 'px';`,
+`      div.style.width  = w    + 'px';`,
+`      div.style.height = h    + 'px';`,
+`      div.style.backgroundImage    = 'url(' + imageSrc + ')';`,
+`      div.style.backgroundSize     = stageW + 'px ' + stageH + 'px';`,
+`      div.style.backgroundPosition = '-' + left + 'px -' + top + 'px';`,
+`      div.dataset.partName      = p.name;`,
+`      div.dataset.baseTransform = '';`,
+`      stage.appendChild(div);`,
+`      layers.push(div);`,
+`    });`,
+``,
+`    if (HAS_MOUTH) initMic();`,
+`    startAutoBehaviors();`,
+`    createButtons();`,
+`  };`,
+`  img.src = imageSrc;`,
+``,
+`  document.addEventListener('mousemove', e => {`,
+`    if (!HAS_HEAD) return;`,
+`    const rect = stage.getBoundingClientRect();`,
+`    mouseX = (e.clientX - (rect.left + rect.width  / 2)) / (rect.width  / 2);`,
+`    mouseY = (e.clientY - (rect.top  + rect.height / 2)) / (rect.height / 2);`,
+`  });`,
+`  document.addEventListener('mouseleave', () => { mouseX = 0; mouseY = 0; });`,
+``,
+`  async function initMic() {`,
+`    try {`,
+`      audioCtx  = new (window.AudioContext || window.webkitAudioContext)();`,
+`      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });`,
+`      micStream = audioCtx.createMediaStreamSource(stream);`,
+`      analyser  = audioCtx.createAnalyser();`,
+`      analyser.fftSize = 256;`,
+`      micStream.connect(analyser);`,
+`    } catch(e) { console.warn('麥克風初始化失敗:', e); }`,
+`  }`,
+``,
+`  function getMicLevel() {`,
+`    if (!analyser) return 0;`,
+`    const data = new Uint8Array(analyser.frequencyBinCount);`,
+`    analyser.getByteFrequencyData(data);`,
+`    let sum = 0;`,
+`    for (let i = 0; i < data.length; i++) sum += data[i];`,
+`    return (sum / data.length / 255) * MIC_SENSITIVITY;`,
+`  }`,
+``,
+`  function startAutoBehaviors() {`,
+`    function loop() {`,
+`      if (HAS_HEAD) {`,
+`        targetRotY = mouseX * FOLLOW_STRENGTH;`,
+`        targetRotX = -mouseY * FOLLOW_STRENGTH;`,
+`      }`,
+`      const mic = HAS_MOUTH ? getMicLevel() : 0;`,
+`      const now = Date.now();`,
+`      if (HAS_EYES && !isBlinking && (now - lastBlinkTime) > BLINK_INTERVAL) {`,
+`        triggerBlink();`,
+`        lastBlinkTime = now;`,
+`      }`,
+`      layers.forEach(layer => {`,
+`        const name = layer.dataset.partName;`,
+`        let transform = layer.dataset.baseTransform || '';`,
+`        if (name === '頭部' && HAS_HEAD) {`,
+`          transform += ' rotateX(' + targetRotX + 'deg) rotateY(' + targetRotY + 'deg)';`,
+`        }`,
+`        if (name === '身體' && autoBreathEnabled) {`,
+`          const breath = 1 + Math.sin(now * 0.003) * 0.02;`,
+`          transform += ' scale(' + breath + ')';`,
+`        }`,
+`        if (name === '嘴巴' && HAS_MOUTH) {`,
+`          transform += ' scaleY(' + (1 + mic * 0.8) + ')';`,
+`        }`,
+`        layer.style.transform = transform;`,
+`      });`,
+`      requestAnimationFrame(loop);`,
+`    }`,
+`    loop();`,
+`  }`,
+``,
+`  function triggerBlink() {`,
+`    if (!HAS_EYES) return;`,
+`    isBlinking = true;`,
+`    const eyeLayers = layers.filter(l => l.dataset.partName === '左眼' || l.dataset.partName === '右眼');`,
+`    eyeLayers.forEach(l => {`,
+`      l.style.transition = 'transform 0.08s ease-in-out';`,
+`      l.style.transform  = (l.dataset.baseTransform || '') + ' scaleY(0.1)';`,
+`    });`,
+`    clearTimeout(blinkTimer);`,
+`    blinkTimer = setTimeout(() => {`,
+`      eyeLayers.forEach(l => {`,
+`        l.style.transition = 'transform 0.08s ease-in-out';`,
+`        l.style.transform  = l.dataset.baseTransform || '';`,
+`      });`,
+`      isBlinking = false;`,
+`    }, 150);`,
+`  }`,
+``,
+`  function createButtons() {`,
+`    availableActions.forEach(act => {`,
+`      const btn = document.createElement('button');`,
+`      btn.className   = 'btn';`,
+`      btn.textContent = act.label;`,
+`      btn.addEventListener('click', () => executeAction(act.key, btn));`,
+`      controls.appendChild(btn);`,
+`    });`,
+`  }`,
+``,
+`  function executeAction(action, btn) {`,
+`    switch (action) {`,
+`      case 'nod':`,
+`        animatePart('頭部', 'rotateX', 15, 600); break;`,
+`      case 'blink':`,
+`        triggerBlink(); break;`,
+`      case 'wave':`,
+`        animatePart('左手', 'rotate', -35, 500);`,
+`        animatePart('右手', 'rotate',  35, 500); break;`,
+`      case 'walk':`,
+`        walkEnabled = !walkEnabled;`,
+`        btn.classList.toggle('active', walkEnabled);`,
+`        walkEnabled ? startWalking() : stopWalking(); break;`,
+`      case 'breathToggle':`,
+`        autoBreathEnabled = !autoBreathEnabled;`,
+`        btn.classList.toggle('active', autoBreathEnabled); break;`,
+`      case 'happy':`,
+`        triggerExpression({ '嘴巴':'scale(1,1.4)', '左眼':'scale(1,0.7)', '右眼':'scale(1,0.7)' }); break;`,
+`      case 'angry':`,
+`        triggerExpression({ '嘴巴':'scale(1,0.5)', '左眼':'rotate(-10deg)', '右眼':'rotate(10deg)' }); break;`,
+`      case 'surprise':`,
+`        triggerExpression({ '嘴巴':'scale(1.6,1.6)', '左眼':'scale(1.3,1.3)', '右眼':'scale(1.3,1.3)' }); break;`,
+`    }`,
+`  }`,
+``,
+`  function animatePart(partName, prop, angle, duration) {`,
+`    layers.forEach(layer => {`,
+`      if (layer.dataset.partName !== partName) return;`,
+`      const orig = layer.dataset.baseTransform || '';`,
+`      layer.style.transition = 'transform ' + duration + 'ms ease-in-out';`,
+`      layer.style.transform  = orig + ' ' + prop + '(' + angle + 'deg)';`,
+`      setTimeout(() => {`,
+`        layer.style.transition = 'transform 0.1s ease-out';`,
+`        layer.style.transform  = orig;`,
+`      }, duration);`,
+`    });`,
+`  }`,
+``,
+`  function startWalking() {`,
+`    let legAngle = 0;`,
+`    walkTimer = setInterval(() => {`,
+`      legAngle += 0.3 * walkDirection;`,
+`      if (Math.abs(legAngle) > 20) walkDirection *= -1;`,
+`      layers.forEach(layer => {`,
+`        const name = layer.dataset.partName;`,
+`        const base = layer.dataset.baseTransform || '';`,
+`        if      (name === '左腿') layer.style.transform = base + ' rotate(' + (-legAngle) + 'deg)';`,
+`        else if (name === '右腿') layer.style.transform = base + ' rotate(' +   legAngle  + 'deg)';`,
+`      });`,
+`    }, 50);`,
+`  }`,
+``,
+`  function stopWalking() {`,
+`    clearInterval(walkTimer);`,
+`    layers.forEach(layer => {`,
+`      if (layer.dataset.partName === '左腿' || layer.dataset.partName === '右腿') {`,
+`        layer.style.transform = layer.dataset.baseTransform || '';`,
+`      }`,
+`    });`,
+`  }`,
+``,
+`  function triggerExpression(transMap) {`,
+`    layers.forEach(layer => {`,
+`      const name = layer.dataset.partName;`,
+`      if (transMap[name]) {`,
+`        layer.style.transition = 'transform 0.2s ease-in-out';`,
+`        layer.style.transform  = (layer.dataset.baseTransform || '') + ' ' + transMap[name];`,
+`      }`,
+`    });`,
+`    setTimeout(() => {`,
+`      layers.forEach(layer => {`,
+`        layer.style.transition = 'transform 0.1s ease-out';`,
+`        layer.style.transform  = layer.dataset.baseTransform || '';`,
+`      });`,
+`    }, 600);`,
+`  }`,
+scriptClose,
+`</body>`,
+`</html>`
+    ].join('\n');
+  }
+
+  exportHtmlBtn.addEventListener('click', () => {
+    const html = generateExportHTML();
+    if (!html) return;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'PNG_VTuber_完整版.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // 延遲 revoke，確保瀏覽器已觸發下載
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    showToast('✅ 匯出成功！');
+  });
+
+})();
+</script>
+</body>
+</html>
